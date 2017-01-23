@@ -1,0 +1,77 @@
+#!/usr/local/bin/python
+
+import popplerqt4
+import sys
+import PyQt4
+import datetime
+from unidecode import unidecode
+
+def main():
+     doc = popplerqt4.Poppler.Document.load(sys.argv[1])
+     try: path = sys.argv[2]
+     except: path="/var/tmp/"
+     
+     out_name = sys.argv[1].split('/')[-1].replace('\ ',' ').strip()[:-4]
+     
+     print out_name
+     
+     date_str= datetime.datetime.now().isoformat().replace("T"," ").replace(":","_")
+
+     if "caution" in sys.argv:
+            out_name = out_name+" "+date_str
+            print 'with caution ...'
+     
+     fo = open(path + out_name+'.txt','w')
+
+     fo.write("\n"+out_name+"\n\n\n")
+     
+     last_page=-1
+
+     total_annotations = 0
+     for i in range(doc.numPages()):
+          page = doc.page(i)
+          annotations = page.annotations()
+          (pwidth, pheight) = (page.pageSize().width(), page.pageSize().height())
+          if len(annotations) > 0:
+               for annotation in annotations:
+                    if  isinstance(annotation, popplerqt4.Poppler.Annotation):
+                         total_annotations += 1
+                         if(isinstance(annotation, popplerqt4.Poppler.HighlightAnnotation)):
+                              quads = annotation.highlightQuads()
+                              txt = ""
+                              for quad in quads:
+                                   rect = (quad.points[0].x() * pwidth,
+                                             quad.points[0].y() * pheight,
+                                             quad.points[2].x() * pwidth,
+                                             quad.points[2].y() * pheight)
+                                   bdy = PyQt4.QtCore.QRectF()
+                                   bdy.setCoords(*rect)
+                                   txt = txt + unicode(page.text(bdy)) + ' '
+                              
+                              if (i+1)!=last_page:
+                                   fo.write("= PDF PAGE {} =".format(i+1)+"\n\n")
+                              fo.write('''"'''+unidecode(txt).replace('\n\n','XXXGXXXXXWXX').replace('\n',' ').replace('  ',' ').replace('XXXGXXXXXWXX','\n')+'''"\n\n\n''')
+                         elif(isinstance(annotation, popplerqt4.Poppler.TextAnnotation)):
+                               note_text="======= Text Note - PDF Page {} ======="
+                               fo.write("="*len(note_text)+'\n')
+                               fo.write("======= Text Note - PDF Page {} =======".format(i+1)+"\n")
+                               fo.write("="*len(note_text)+"\n"+'\n')
+                               fo.write(annotation.contents()+"\n\n")
+                               fo.write("="*len(note_text)+'\n\n\n')
+                         last_page=i+1
+     
+     
+     if total_annotations > 0:
+          fo.write(str(total_annotations) + " annotation(s) found\n")
+          fo.write(datetime.datetime.now().isoformat().replace("T"," ").split(".")[0]+"\n")
+     else:
+          print("no annotations found")
+     fo.close()
+     final_text = open(path + out_name+'.txt').read()
+     print(final_text)
+     
+if __name__ == "__main__":
+     main()
+
+
+
